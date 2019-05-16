@@ -17,6 +17,7 @@ class ObjDetection(object):
         self.config_model()
         self.__start_conf()
         self.__load_model()
+        self.__start_sess()
     def ___config_model(self, name = 'inference_graph', ptl = 'labelmap.pbtxt'):
         self.graph = None
         self.TENSOR = None
@@ -34,5 +35,17 @@ class ObjDetection(object):
         with tf.Graph().as_default() as graph:
             tf.import_graph_def(graph_def, name="prefix")
             self.graph = graph
-    def find_signals(self, frame):
-        pass
+    def __start_sess(self):
+        with tf.Session(graph = self.graph) as sess:
+            self.sess = sess
+    def predict(self, frame):
+        image_np_expanded = np.expand_dims(frame, axis=0)
+        output_dict = self.sess.run(y, feed_dict={x: image_np_expanded})
+        output_dict['num_detections'] = int(output_dict['num_detections'][0])
+        output_dict['detection_classes'] = output_dict['detection_classes'][0].astype(np.int64)
+        output_dict['detection_boxes'] = output_dict['detection_boxes'][0]
+        output_dict['detection_scores'] = output_dict['detection_scores'][0]
+        if 'detection_masks' in output_dict:
+            output_dict['detection_masks'] = output_dict['detection_masks'][0]
+        return output_dict
+        
