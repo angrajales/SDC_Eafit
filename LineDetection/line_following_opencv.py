@@ -37,6 +37,13 @@ class LineFollowing(object):
                     else:
                         n_slope = last_valid_slope
                     text = ""
+                    distance = (frame.shape[1] - x1) / frame.shape[1] + (frame.shape[1] - x2) / frame.shape[1]
+                    if distance > 0.65:
+                        p_next_action = "ML"
+                        text = "Move Left"
+                    elif distance < 0.35:
+                        p_next_action = "MR"
+                        text = "Move Right"
                     if abs(n_slope) < 1.0:
                         text = "Move either left or right"
                         p_next_action = "MLR"
@@ -48,6 +55,7 @@ class LineFollowing(object):
                     frame_center_x = int((frame.shape[1] - textsize[0]) / 2)
                     frame_center_y = int((frame.shape[0] + textsize[1]) / 2)
                     cv2.line(line_image,(x1,y1),(x2,y2),(0,0,255),10)
+                    distance = (frame.shape[1] - x1) / frame.shape[1] + (frame.shape[1] - x2) / frame.shape[1]
                     cv2.putText(frame, text, (frame_center_x, frame_center_y ), font, 1, (0, 255, 0), 5)
             lines_edges = cv2.addWeighted(frame, 0.8, line_image, 1, 0)
         return [lines_edges, p_next_action, last_valid_slope]
