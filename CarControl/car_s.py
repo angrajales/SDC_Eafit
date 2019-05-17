@@ -44,7 +44,7 @@ def main(ip):
     sr = SignalRecollection()
 
     time_to_wait = 0.1
-    time_to_wait_cali = 4
+    time_to_wait_cali = 1
     
 
     '''
@@ -78,13 +78,14 @@ def recognize_action():
     global_state = -1
     while(True):
         action_p, action_c = get_action_prom()
-        state = str(get_state_frequency())
-
+        state,area = get_state_frequency()
+        state = str(state)
+        print("AREA ---------------------->", area)
         if (state == '2' or state =='3'):
             if global_state == -1:
                 global_state = state;
         print('STATE -> ',state, ' ACTION C -> ',action_c,' ACTION P -> ',action_p, ' GLOBAL STATE -> ', global_state )
-        if not(global_state == -1) and (action_p == 'lt_rg'): 
+        if not(global_state == -1) and area > 4000: 
             request_action(global_state)
             global_state = -1
         else:
@@ -106,7 +107,12 @@ def get_state_frequency():
     while limit > 0:
         print(dic_t)
         frame = request_frame()
-        state = sr.get_state(frame)
+        returned = sr.get_state(frame)
+
+        if(len(returned) == 2):
+            state,area = returned
+        else:
+            state = returned
 
         if state in dic_t:
             dic_t[state] = dic_t[state] + 1
@@ -123,7 +129,7 @@ def get_state_frequency():
             max_number = value
             max_id = key
    
-    return max_id
+    return max_id,area
 
 
 def request_action(action):
@@ -151,33 +157,45 @@ def request_action(action):
         send_action('stop')
         send_action('fwstraight')
     if action == '2':
-        print('long')
-        send_action('100',msg='speed')
+        send_action('80',msg='speed')
+        send_action('fwstraight')
+        send_action('forward')
+        time.sleep(0.2)
         send_action('fwright')
-        r = requests.get(default_link_cali)
-        send_cali('bwcali')
-        send_cali('bwcaliright')
-        time.sleep(time_to_wait_cali)
-        send_cali('bwcaliright')
-        r = requests.get(deafult_link_actions)
+        send_action('forward')
+        time.sleep(1.2)
+        send_action('fwstraight')
+        send_action('fwleft')
+        send_action('backward')
+        time.sleep(1)
         send_action('40',msg='speed')
+        send_action('fwright')
+        send_action('forward')
+        time.sleep(0.2)
         send_action('fwstraight')
         send_action('stop')
     if action == '3':
-        print('long')
-        send_action('100',msg='speed')
+        send_action('80',msg='speed')
+        send_action('fwstraight')
+        send_action('forward')
+        time.sleep(0.2)
         send_action('fwleft')
-        r = requests.get(default_link_cali)
-        send_cali('bwcali')
-        send_cali('bwcalileft')
-        time.sleep(time_to_wait_cali)
-        send_cali('bwcalileft')
-        r = requests.get(deafult_link_actions)
+        send_action('forward')
+        time.sleep(1.2)
+        send_action('fwstraight')
+        send_action('fwright')
+        send_action('backward')
+        time.sleep(1)
         send_action('40',msg='speed')
+        send_action('fwleft')
+        send_action('forward')
+        time.sleep(0.2)
         send_action('fwstraight')
         send_action('stop')
-
     return
+
+
+
 
 def send_action(action,msg='action'):
     payload = {msg:action}

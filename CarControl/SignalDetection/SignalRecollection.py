@@ -37,17 +37,17 @@ class SignalRecollection(object):
                 square = frame[y-r:y+r, x-r:x+r]
                 dominant_color = self.get_dominant_color(square, 2)
                 if dominant_color[1] > 120:
-                    return 2
+                    return [2,(3.1416*(r*r))]
                 elif dominant_color[2] > 50 and dominant_color[0] > 80:
-                    return 3
+                    return [3, (3.1416*(r*r))]
                 else:
-                    return 1
+                    return [1, (3.1416*(r*r))]
 
             for i in circles[0, :]:
                 cv2.circle(frame, (i[0], i[1]), i[2], (0, 255, 0), 2)
                 cv2.circle(frame, (i[0], i[1]), 2, (0, 0, 255), 3)
         else:
-            return 0
+            return [0, 0]
         
         return (x, y, r)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             break
         state = lf.get_state(frame)
 
-        print(state)
+        print(state[0])
 
         cv2.imshow("Image", frame)
         time.sleep(0.1)
