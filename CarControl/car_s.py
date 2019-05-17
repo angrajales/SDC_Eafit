@@ -2,6 +2,8 @@ import requests
 import numpy as np
 import cv2
 from LineDetection.LineFollowing import *
+from SignalDetection.SignalRecollection import *
+
 import time
 import threading
 
@@ -10,6 +12,7 @@ default_link_stream = ''
 default_link_cali = ''
 cap = None
 lf = None
+sr = None
 time_to_wait = None
 time_to_wait_cali = None
 
@@ -30,15 +33,19 @@ def display_frame():
 
 
 def main(ip):
-    global cap,deafult_link_actions,default_link_stream,lf,time_to_wait,default_link_cali,time_to_wait_cali
+    global cap,deafult_link_actions,default_link_stream,lf,time_to_wait,sr,default_link_cali,time_to_wait_cali
     ip ='192.168.0.'+ip
     deafult_link_actions = 'http://'+ip+':8000/run/'
     default_link_stream =  'http://'+ip+':8080/'
     default_link_cali = 'http://' + ip + ':8000/cali/'
     cap = cv2.VideoCapture( default_link_stream +'?action=stream' )
+
     lf = LineFollowing()
+    sr = SignalRecollection()
+
     time_to_wait = 0.1
     time_to_wait_cali = 4
+    
 
     '''
     hilo = threading.Thread(name='frame_thread',
@@ -50,14 +57,15 @@ def main(ip):
     print(default_link_stream)
     print(default_link_cali)
 
-    #while(True):
-    
-    #request_action('long_lf')
-
-    #while(True):
-    #    request_action('fw')
     recognize_action()
 
+
+    '''
+    0 -> Acciones correctivas
+    1 -> no reconoce izq derecha 
+    2 -> Derecha
+    3 -> Izquierda
+    '''
 
 
     '''
@@ -67,16 +75,21 @@ def main(ip):
         st -> stop
     '''
 def recognize_action():
+    global_state = -1
     while(True):
-        action = get_action_prom()
-        print(action)
-        state = get_state()
+        action_p, action_c = get_action_prom()
+        state = str(get_state_frequency())
 
-        #action e (lt_rg, fw)
-        if action == 'lf' or action == 'fw' or action == 'rg' or action == 'bw':
-            request_action(action)
-        if action == 'lt_rg':
-            request_action(state)
+        if (state == '2' or state =='3'):
+            if global_state == -1:
+                global_state = state;
+        print('STATE -> ',state, ' ACTION C -> ',action_c,' ACTION P -> ',action_p, ' GLOBAL STATE -> ', global_state )
+        if not(global_state == -1) and (action_p == 'lt_rg'): 
+            request_action(global_state)
+            global_state = -1
+        else:
+            request_action(action_c)
+        
 '''
         fw -> foward
         lf -> left
@@ -85,6 +98,34 @@ def recognize_action():
         long_lf -> long left
         long_rg -> long right
 ''' 
+
+def get_state_frequency():
+    dic_t = {}
+    limit = 12
+
+    while limit > 0:
+        print(dic_t)
+        frame = request_frame()
+        state = sr.get_state(frame)
+
+        if state in dic_t:
+            dic_t[state] = dic_t[state] + 1
+        else:
+            dic_t[state] = 1
+        
+        limit = limit - 1
+
+    max_number, max_id = 0,''
+
+    for key in dic_t:
+        value = dic_t[key]
+        if value > max_number:
+            max_number = value
+            max_id = key
+   
+    return max_id
+
+
 def request_action(action):
 
     #/run/?action=fwstraight
@@ -109,7 +150,20 @@ def request_action(action):
         time.sleep(time_to_wait)
         send_action('stop')
         send_action('fwstraight')
-    if action == 'long_lf':
+    if action == '2':
+        print('long')
+        send_action('100',msg='speed')
+        send_action('fwright')
+        r = requests.get(default_link_cali)
+        send_cali('bwcali')
+        send_cali('bwcaliright')
+        time.sleep(time_to_wait_cali)
+        send_cali('bwcaliright')
+        r = requests.get(deafult_link_actions)
+        send_action('40',msg='speed')
+        send_action('fwstraight')
+        send_action('stop')
+    if action == '3':
         print('long')
         send_action('100',msg='speed')
         send_action('fwleft')
@@ -145,29 +199,42 @@ def get_state():
 
 
 def get_action_prom():
-    dic_t = {}
+    dic_p = {}
+    dic_c = {}
     limit = 12
 
     while limit > 0:
-        print(dic_t)
-        response = get_action()
+        print(dic_p)
+        print(dic_c)
+        p_next_action,p_next_action_c = get_action()
 
-        if response in dic_t:
-            dic_t[response] = dic_t[response] + 1
+        if p_next_action in dic_p:
+            dic_p[p_next_action] = dic_p[p_next_action] + 1
         else:
-            dic_t[response] = 1
+            dic_p[p_next_action] = 1
+
+        if p_next_action_c in dic_c:
+            dic_c[p_next_action_c] = dic_c[p_next_action_c] + 1
+        else:
+            dic_c[p_next_action_c] = 1
+        
         limit = limit - 1
     
-    max_number, max_id = 0,''
-
-
-    for key in dic_t:
-        value = dic_t[key]
+    max_number, max_id_c = 0,''
+    for key in dic_p:
+        value = dic_p[key]
         if value > max_number:
             max_number = value
-            max_id = key
+            max_id_c = key
+
+    max_number, max_id_p = 0,''
+    for key in dic_c:
+        value = dic_c[key]
+        if value > max_number:
+            max_number = value
+            max_id_p = key
    
-    return max_id
+    return max_id_c,max_id_p
 
 def get_action():
     frame = request_frame()
@@ -178,18 +245,23 @@ def get_action():
 
     [lines_edges, p_next_action_c, p_next_action, last_valid_slope] = lf.next_action(frame)
 
-    if p_next_action_c == 'MLR':
-        return 'lt_rg'
-    elif p_next_action_c == 'ML':
-        return 'lf'
-    elif p_next_action_c == 'MR':
-        return 'rg'
-    elif p_next_action_c == 'MF':
-        return 'fw'
-    else:
+    if p_next_action == 'MLR':
+        p_next_action =  'lt_rg'
+
+    if p_next_action == 'MF':
+        p_next_action = 'fw'
+
+    if p_next_action_c == 'ML':
+        p_next_action_c = 'lf'
+    
+    if p_next_action_c == 'MR':
+        p_next_action_c = 'rg'
+
+    if p_next_action == "do_nothing":
         #Example p_next_action == 'do_nothing'
-        return 'bw'    
-        
+        p_next_action,p_next_action_c = 'bw','bw'
+
+    return p_next_action,p_next_action_c
 
 def request_frame():
     if(cap.isOpened()):  
