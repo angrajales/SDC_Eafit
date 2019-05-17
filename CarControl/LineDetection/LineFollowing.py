@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 class LineFollowing(object):
     def __init__(self):
@@ -10,6 +11,7 @@ class LineFollowing(object):
         self.ignore_mask_color = 255 # White color
     def next_action(self, frame, slope=-1):
         p_next_action = "do_nothing"
+        p_next_action_c = "do_nothing"
         canny = self.__do_canny(frame)
         frame_shape = frame.shape
         vertices = np.array([[(0,frame_shape[0]),(self.polyLeft1, self.polyRight1), (self.polyLeft2, self.polyRight2), (frame_shape[1],frame_shape[0])]], dtype=np.int32)
@@ -37,17 +39,21 @@ class LineFollowing(object):
                     else:
                         n_slope = last_valid_slope
                     text = ""
-                    distance = (frame.shape[1] - x1) / frame.shape[1] + (frame.shape[1] - x2) / frame.shape[1]
-                    if distance > 0.65:
-                        p_next_action = "ML"
+                    distance = (frame.shape[0] - x1) / frame.shape[0] + (frame.shape[0] - x2) / frame.shape[1]
+                    if distance > 0.530:
+                        print('Distance -> ',  str(distance), 'ML')
+                        p_next_action_c = "ML"
                         text = "Move Left"
-                    elif distance < 0.35:
-                        p_next_action = "MR"
+                    elif distance < 0.470:
+                        print('Distance -> ',  str(distance), 'MR')
+                        p_next_action_c = "MR"
                         text = "Move Right"
                     if abs(n_slope) < 1.0:
+                        print('slope -> ',  str(abs(n_slope)), 'MLR')
                         text = "Move either left or right"
                         p_next_action = "MLR"
                     else:
+                        print('Slope -> ',  str(abs(n_slope)), 'MF')
                         text = "Move forward"
                         p_next_action = "MF"
                     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -58,7 +64,7 @@ class LineFollowing(object):
                     distance = (frame.shape[1] - x1) / frame.shape[1] + (frame.shape[1] - x2) / frame.shape[1]
                     cv2.putText(frame, text, (frame_center_x, frame_center_y ), font, 1, (0, 255, 0), 5)
             lines_edges = cv2.addWeighted(frame, 0.8, line_image, 1, 0)
-        return [lines_edges, p_next_action, last_valid_slope]
+        return [lines_edges, p_next_action_c, p_next_action, last_valid_slope]
     def __tune_params(self):
         rho = 2
         theta = np.pi / 180
@@ -69,22 +75,23 @@ class LineFollowing(object):
 
     def __do_canny(self, frame):
         gray_image = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        blurred_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
+        blurred_image = cv2.GaussianBlur(gray_image, (9, 9), 0)
         canny = cv2.Canny(blurred_image, 50, 150)
         return canny
 
-# if __name__ == "__main__":
-#     lf = LineFollowing()
-#     cap = cv2.VideoCapture('./outputF1.avi')
-#     while cap.isOpened():
-#         ret, frame = cap.read()
-#         if not ret:
-#             break
-#         [line_edges, p_next_action, last_valid_slope] = lf.next_action(frame)
-#         if p_next_action != "do_nothing":
-#             cv2.imshow("Image", line_edges)
-#         else:
-#             print("Error while trying the image...")
-#             continue
-#         if cv2.waitKey(25) & 0xFF == ord('q'):
-#             break
+if __name__ == "__main__":
+    lf = LineFollowing()
+    cap = cv2.VideoCapture('./out2.avi')
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: 
+            break
+        [lines_edges, p_next_action_c, p_next_action, last_valid_slope] = lf.next_action(frame)
+        if p_next_action != "do_nothing":
+            cv2.imshow("Image", line_edges)
+            time.sleep(0.1)
+        else:
+            print("Error while trying the image...")
+            continue
+        if cv2.waitKey(25) & 0xFF == ord('q'):
+            break
