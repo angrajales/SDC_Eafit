@@ -38,6 +38,7 @@ class LineFollowing(object):
                         n_slope = last_valid_slope
                     text = ""
                     text1 = ""
+                    distance = (frame.shape[0] - x1) / frame.shape[0] + (frame.shape[0] - x2) / frame.shape[0]
                     if distance > 0.515:
                         text1 = "Move Left"
                     elif distance < 0.485:
